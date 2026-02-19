@@ -1,0 +1,30 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.env
+
+# pytorch / artifacts
+artifacts/
+*.pt
+*.pth
+
+# data
+data/
+*.csv
+*.tsv
+*.txt
+*.parquet
+
+# mac
+.DS_Store
+
+# editors
+.vscode/
+.idea/
+
