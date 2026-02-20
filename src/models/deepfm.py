@@ -21,18 +21,18 @@ class MLP(nn.Module):
         return self.net(x)
 
 
-class DeepFM(nn.Module):
+class DeepFMFieldWise(nn.Module):
     """
-    DeepFM with:
-      - dense features fed into both FM (as 1st order via linear) and deep
-      - sparse features via embeddings
-      - FM 2nd-order uses embeddings only (typical for CTR setups)
+    DeepFM with field-wise embeddings:
+      - each categorical field j has its own embedding table
+      - avoids cross-field hash collisions
+    sparse input: (B, num_sparse), where each column is in [0, hash_bucket_size_per_field)
     """
     def __init__(
         self,
         num_dense: int,
         num_sparse: int,
-        hash_bucket_size: int,
+        hash_bucket_size_per_field: int,
         embed_dim: int,
         mlp_dims: List[int],
         dropout: float,
@@ -41,13 +41,18 @@ class DeepFM(nn.Module):
         self.num_dense = num_dense
         self.num_sparse = num_sparse
         self.embed_dim = embed_dim
+        self.hash_bucket_size_per_field = hash_bucket_size_per_field
 
-        # first-order (linear) part
+        # First-order part
         self.linear_dense = nn.Linear(num_dense, 1)
-        self.linear_sparse = nn.Embedding(hash_bucket_size, 1)
+        self.linear_sparse = nn.ModuleList(
+            [nn.Embedding(hash_bucket_size_per_field, 1) for _ in range(num_sparse)]
+        )
 
-        # embeddings for FM second-order + Deep
-        self.embed = nn.Embedding(hash_bucket_size, embed_dim)
+        # Field-wise embeddings for FM2 + Deep
+        self.embed = nn.ModuleList(
+            [nn.Embedding(hash_bucket_size_per_field, embed_dim) for _ in range(num_sparse)]
+        )
 
         deep_in_dim = num_dense + num_sparse * embed_dim
         self.mlp = MLP(deep_in_dim, mlp_dims, dropout)
@@ -55,15 +60,15 @@ class DeepFM(nn.Module):
 
         self.bias = nn.Parameter(torch.zeros(1))
 
-        # init
-        nn.init.xavier_uniform_(self.embed.weight.data)
-        nn.init.xavier_uniform_(self.linear_sparse.weight.data)
-        # linear_dense and deep_out use default init (fine)
+        # Init
+        for emb in self.embed:
+            nn.init.xavier_uniform_(emb.weight.data)
+        for emb1 in self.linear_sparse:
+            nn.init.xavier_uniform_(emb1.weight.data)
 
     def fm_second_order(self, emb: torch.Tensor) -> torch.Tensor:
         """
-        emb: (B, num_sparse, embed_dim)
-        FM 2nd-order: 0.5 * ( (sum v)^2 - sum(v^2) ) over fields
+        emb: (B, F, K)
         returns: (B, 1)
         """
         sum_v = emb.sum(dim=1)                 # (B, K)
@@ -75,22 +80,31 @@ class DeepFM(nn.Module):
 
     def forward(self, dense: torch.Tensor, sparse: torch.Tensor) -> torch.Tensor:
         """
-        dense: (B, 13) float
-        sparse: (B, 26) int64
+        dense: (B, num_dense) float
+        sparse: (B, num_sparse) int64, each col in [0, hash_bucket_size_per_field)
         returns logits: (B,)
         """
-        # linear part
-        y_linear = self.linear_dense(dense) + self.linear_sparse(sparse).sum(dim=1) + self.bias  # (B,1)
+        # Linear term
+        y_linear = self.linear_dense(dense) + self.bias  # (B,1)
+        # Add per-field sparse linear weights
+        # each: (B,1), summed over fields -> (B,1)
+        y_linear = y_linear + torch.stack(
+            [self.linear_sparse[j](sparse[:, j]) for j in range(self.num_sparse)],
+            dim=1
+        ).sum(dim=1)
 
-        # embeddings
-        emb = self.embed(sparse)  # (B, 26, K)
+        # Field-wise embeddings -> (B, F, K)
+        emb = torch.stack(
+            [self.embed[j](sparse[:, j]) for j in range(self.num_sparse)],
+            dim=1
+        )
 
         # FM second-order
         y_fm2 = self.fm_second_order(emb)  # (B,1)
 
         # Deep part
-        deep_in = torch.cat([dense, emb.flatten(start_dim=1)], dim=1)  # (B, 13 + 26*K)
+        deep_in = torch.cat([dense, emb.flatten(start_dim=1)], dim=1)
         y_deep = self.deep_out(self.mlp(deep_in))  # (B,1)
 
-        logits = (y_linear + y_fm2 + y_deep).squeeze(1)  # (B,)
+        logits = (y_linear + y_fm2 + y_deep).squeeze(1)
         return logits

@@ -61,4 +61,57 @@ is in line with expected baseline results for DeepFM on the full Criteo dataset 
 
 This run serves as a **reference baseline** for subsequent experiments (e.g. embedding dimension tuning, field-wise embeddings, regularization).
 
+## Embedding Dimension Study (5M-row Subset)
 
+To efficiently tune model capacity, we trained DeepFM on a 5M-row subset of the Criteo dataset and applied early stopping after one epoch (based on validation logloss).
+
+### Experimental setup
+- Dataset: 5M training rows + validation split
+- Early stopping: epoch 1
+- Other settings identical to full-data baseline
+
+### Results
+
+| Embedding Dim | Validation AUC | Validation LogLoss |
+|--------------:|---------------:|-------------------:|
+| 8  | 0.7913 | 0.4586 |
+| 16 | **0.7929** | **0.4573** |
+| 32 | 0.7930 | 0.4573 |
+
+### Interpretation
+
+- Increasing embedding dimension improves performance, but with **diminishing returns**.
+- `embed_dim = 16` provides the best tradeoff between model capacity and generalization.
+- Increasing to `embed_dim = 32` yields negligible gains in AUC and does not improve logloss.
+- The performance trends on the 5M subset are consistent with full-dataset results, validating the use of the subset for hyperparameter tuning.
+
+Based on these results, `embed_dim = 16` is selected as the default embedding size for subsequent experiments.
+
+# Next
+
+Field-wise embeddings instead of global hashing
+
+Regularization:
+Increase dropout (e.g. 0.3)
+Add L2 on embeddings
+Lower learning rate (e.g. 5e-4)
+
+## Field-wise Hash Buckets Study (5M-row Subset)
+
+To reduce harmful hash collisions across categorical fields, we replaced a single global hash table with **field-wise embedding tables** (one embedding table per categorical feature). We trained on a 5M-row subset and applied early stopping after one epoch based on validation logloss.
+
+### Results (early stop @ epoch 1)
+
+| Hash Buckets per Field | Validation AUC | Validation LogLoss |
+|-----------------------:|---------------:|-------------------:|
+| 2^15 (32768)  | 0.792782 | 0.457598 |
+| 2^16 (65536)  | 0.792831 | 0.457367 |
+| 2^17 (131072) | **0.793517** | **0.457130** |
+
+### Interpretation
+
+- Increasing the number of buckets per field reduces within-field collisions and improves model quality.
+- Gains are more pronounced in **logloss** (probability calibration) than AUC, which is typical for CTR modeling.
+- `2^17` buckets per field achieved the best performance in this sweep and is selected as the default for subsequent experiments.
+
+Seed = 40 embed_dim=16 val_auc=0.794836 val_logloss=0.456404

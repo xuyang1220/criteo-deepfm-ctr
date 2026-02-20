@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from src.data.criteo import CriteoIterable, criteo_collate
-from src.models.deepfm import DeepFM
+from src.models.deepfm import DeepFMFieldWise
 from src.utils.seed import seed_everything
 from src.utils.metrics import compute_metrics
 
@@ -66,6 +66,7 @@ def main(cfg_path: str):
     ds_tr = CriteoIterable(
         train_path, tr_idx,
         hash_bucket_size=cfg["features"]["hash_bucket_size"],
+        hash_bucket_size_per_field=cfg["features"]["hash_bucket_size_per_field"],
         num_dense=cfg["features"]["num_dense"],
         num_sparse=cfg["features"]["num_sparse"],
         cat_missing_token=cfg["features"]["cat_missing_token"],
@@ -73,6 +74,7 @@ def main(cfg_path: str):
     ds_val = CriteoIterable(
         train_path, val_idx,
         hash_bucket_size=cfg["features"]["hash_bucket_size"],
+        hash_bucket_size_per_field=cfg["features"]["hash_bucket_size_per_field"],
         num_dense=cfg["features"]["num_dense"],
         num_sparse=cfg["features"]["num_sparse"],
         cat_missing_token=cfg["features"]["cat_missing_token"],
@@ -97,10 +99,10 @@ def main(cfg_path: str):
         drop_last=False,
     )
 
-    model = DeepFM(
+    model = DeepFMFieldWise(
         num_dense=cfg["features"]["num_dense"],
         num_sparse=cfg["features"]["num_sparse"],
-        hash_bucket_size=cfg["features"]["hash_bucket_size"],
+        hash_bucket_size_per_field=cfg["features"]["hash_bucket_size_per_field"],
         embed_dim=cfg["features"]["embed_dim"],
         mlp_dims=cfg["model"]["mlp_dims"],
         dropout=cfg["model"]["dropout"],
@@ -134,7 +136,7 @@ def main(cfg_path: str):
                 pbar.set_postfix(loss=float(loss.detach().cpu().item()))
 
         metrics = evaluate(model, dl_val, device)
-        print(f"[epoch {epoch}] val_auc={metrics['auc']:.6f} val_logloss={metrics['logloss']:.6f}")
+        print(f"[epoch {epoch}] embed_dim={cfg['features']['embed_dim']} val_auc={metrics['auc']:.6f} val_logloss={metrics['logloss']:.6f}")
 
     os.makedirs("artifacts", exist_ok=True)
     ckpt_path = "artifacts/deepfm.pt"
