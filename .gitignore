@@ -20,6 +20,7 @@ artifacts/
 *.tsv
 *.txt
 *.parquet
+!requirements.txt
 
 # mac
 .DS_Store
