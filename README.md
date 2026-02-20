@@ -7,8 +7,7 @@ pip install -r requirements.txt
 Edit configs/base.yaml -> data.train_path  
 python -m src.train --config configs/base.yaml
 
-### Baseline performance
-## Results on Full Criteo Dataset (45M rows)
+## Baseline results on Full Criteo Dataset (45M rows)
 
 ### Experimental setup
 - Dataset: **Kaggle Criteo Display Ads Challenge** (~45M samples)
