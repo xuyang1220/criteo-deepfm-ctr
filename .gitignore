@@ -28,3 +28,8 @@ artifacts/
 .vscode/
 .idea/
 
+# local configs
+local.yaml
+
+#checkpoints
+.ipynb_checkpoints

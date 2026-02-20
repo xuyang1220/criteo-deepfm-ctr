@@ -12,6 +12,7 @@ from src.models.deepfm import DeepFMFieldWise
 from src.utils.seed import seed_everything
 from src.utils.metrics import compute_metrics
 
+torch.set_num_threads(20)
 
 def load_cfg(path: str):
     with open(path, "r", encoding="utf-8") as f:
