@@ -3,6 +3,7 @@ data:
   valid_ratio: 0.05
   num_workers: 2
   batch_size: 4096
+  max_rows: 5000000
 
 features:
   num_dense: 13
@@ -10,7 +11,7 @@ features:
   # total hash buckets across all categorical fields
   # (you can increase later; 2^20 ~ 1,048,576 is common)
   hash_bucket_size: 262144
-  embed_dim: 16
+  embed_dim: 8
   # optional: treat missing categorical token explicitly
   cat_missing_token: "__MISSING__"
 
@@ -21,7 +22,7 @@ model:
 train:
   seed: 42
   device: "cpu"   # or "cpu"
-  epochs: 3
+  epochs: 1
   lr: 0.001
   weight_decay: 1.0e-6
   log_every: 200
