@@ -32,4 +32,4 @@ artifacts/
 local.yaml
 
 #checkpoints
-.ipynb_checkpoints
+.ipynb_checkpoints/
