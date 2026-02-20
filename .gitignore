@@ -32,5 +32,6 @@ artifacts/
 # local configs
 local.yaml
 
-#checkpoints
+# Jupyter
 .ipynb_checkpoints/
+**/.ipynb_checkpoints/
