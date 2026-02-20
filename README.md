@@ -3,6 +3,11 @@
 ## Setup
 pip install -r requirements.txt
 
+## Data
+Download the [Criteo Display Ads dataset](https://www.kaggle.com/datasets/mrkmakr/criteo-dataset?select=dac) 
+and place train.txt under:  
+data/criteo/train.txt
+
 ## Train
 Edit configs/base.yaml -> data.train_path  
 python -m src.train --config configs/base.yaml
