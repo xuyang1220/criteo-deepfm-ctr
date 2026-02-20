@@ -119,4 +119,5 @@ To reduce harmful hash collisions across categorical fields, we replaced a singl
 - Gains are more pronounced in **logloss** (probability calibration) than AUC, which is typical for CTR modeling.
 - `2^17` buckets per field achieved the best performance in this sweep and is selected as the default for subsequent experiments.
 
+### Draft below
 Seed = 40 embed_dim=16 val_auc=0.794836 val_logloss=0.456404
