@@ -92,9 +92,7 @@ To efficiently tune model capacity, we trained DeepFM on a 5M-row subset of the 
 
 Based on these results, `embed_dim = 16` is selected as the default embedding size for subsequent experiments.
 
-# Next
-
-Field-wise embeddings instead of global hashing
+## Field-wise embeddings instead of global hashing
 
 Regularization:
 Increase dropout (e.g. 0.3)
@@ -155,3 +153,31 @@ After validating model behavior on a 5M-row subset, we trained DeepFM on the ful
 - Based on these results, **MD5 hashing with 65,536 buckets per field** is selected as the final configuration.
 
 This configuration serves as the reference DeepFM model for further comparisons and extensions.
+
+## Results Summary
+
+The table below summarizes the progression of DeepFM experiments conducted on the Criteo Display Ads dataset, from baseline implementations to optimized field-wise hashing on the full dataset.
+
+| Dataset Size | Model Variant | Hashing Strategy | Hash Buckets | Embed Dim | Validation AUC | Validation LogLoss |
+|--------------|--------------|------------------|--------------|-----------|----------------|--------------------|
+| 45M | DeepFM (baseline) | Global hash | 262,144 (global) | 16 | 0.8043 | 0.4468 |
+| 45M | DeepFM (baseline) | Global hash | 262,144 (global) | 16 | 0.8033 | 0.4495 |
+| 45M | DeepFM (baseline) | Global hash | 262,144 (global) | 16 | 0.7987 | 0.4563 |
+| 5M | DeepFM | Global hash | 262,144 (global) | 8  | 0.7913 | 0.4586 |
+| 5M | DeepFM | Global hash | 262,144 (global) | 16 | 0.7929 | 0.4573 |
+| 5M | DeepFM | Global hash | 262,144 (global) | 32 | 0.7930 | 0.4573 |
+| 5M | DeepFM | Field-wise hash | 32,768 (2^15 / field) | 16 | 0.7928 | 0.4576 |
+| 5M | DeepFM | Field-wise hash | 65,536 (2^16 / field) | 16 | 0.7928 | 0.4574 |
+| 5M | DeepFM | Field-wise hash | 131,072 (2^17 / field) | 16 | 0.7935 | 0.4571 |
+| 45M | DeepFM | Field-wise hash (CRC32) | 65,536 (2^16 / field) | 16 | 0.8049 | 0.4469 |
+| 45M | DeepFM | Field-wise hash (MD5) | 65,536 (2^16 / field) | 16 | **0.8050** | **0.4467** |
+| 45M | DeepFM | Field-wise hash (MD5) | 131,072 (2^17 / field) | 16 | 0.8052 | 0.4470 |
+
+### Key Observations
+
+- Training beyond one epoch on the full dataset consistently degraded validation logloss, confirming the need for early stopping in large-scale CTR settings.
+- Increasing embedding dimension beyond 16 provided diminishing returns under both global and field-wise hashing.
+- Field-wise hashing consistently improved performance over a single global hash table, particularly in terms of logloss.
+- MD5 hashing slightly outperformed CRC32 at the same bucket size, likely due to more uniform hash distribution.
+- Increasing hash buckets per field beyond 2^16 yielded marginal AUC gains but worsened logloss, indicating reduced regularization.
+- The best overall configuration was DeepFM with field-wise hashing, MD5, 65,536 buckets per field, and embedding dimension 16.
