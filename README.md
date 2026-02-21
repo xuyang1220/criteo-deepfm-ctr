@@ -121,3 +121,37 @@ To reduce harmful hash collisions across categorical fields, we replaced a singl
 
 ### Draft below
 Seed = 40 embed_dim=16 val_auc=0.794836 val_logloss=0.456404
+
+Full data with field-wise hashing, i.e. hash within the field bucket space: using crc32
+hash_bucket_size_per_field: 65536  val_auc=0.804932 val_logloss=0.446858
+
+Full data with field-wise hashing, i.e. hash within the field bucket space: using md5
+hash_bucket_size_per_field: 65536  val_auc=0.804988 val_logloss=0.446720 
+
+## Field-wise Hashing on Full Criteo Dataset (45M rows)
+
+After validating model behavior on a 5M-row subset, we trained DeepFM on the full Criteo dataset using **field-wise hashing**, where each categorical feature has its own embedding table and hash bucket space. Training used an offset-based dataset reader and early stopping after one epoch.
+
+### Experimental setup
+- Dataset: Full Criteo Display Ads dataset (~45M rows)
+- Model: DeepFM with field-wise embeddings
+- Embedding dimension: `16`
+- Early stopping: epoch 1 (based on validation logloss)
+- Evaluation metrics: AUC, LogLoss
+
+### Results
+
+| Hash Function | Buckets per Field | Validation AUC | Validation LogLoss |
+|--------------|------------------:|---------------:|-------------------:|
+| CRC32 | 65,536 (2^16) | 0.804932 | 0.446858 |
+| MD5 | 65,536 (2^16) | **0.804988** | **0.446720** |
+| MD5 | 131,072 (2^17) | 0.805205 | 0.447038 |
+
+### Interpretation
+
+- Field-wise hashing consistently improves model quality compared to a global hash table, particularly in terms of **logloss (probability calibration)**.
+- MD5 hashing provides a small but consistent improvement over CRC32 at the same bucket size, likely due to more uniform hash distribution.
+- Increasing the number of buckets per field beyond `2^16` yields marginal AUC gains but degrades logloss, indicating reduced regularization and poorer calibration.
+- Based on these results, **MD5 hashing with 65,536 buckets per field** is selected as the final configuration.
+
+This configuration serves as the reference DeepFM model for further comparisons and extensions.

@@ -7,7 +7,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from src.data.criteo import CriteoIterable, criteo_collate
+from src.data.criteo_offsets_fieldwise import (
+    CriteoOffsetDatasetFieldWise,
+    criteo_collate,
+    build_line_offsets,
+)
 from src.models.deepfm import DeepFMFieldWise
 from src.utils.seed import seed_everything
 from src.utils.metrics import compute_metrics
@@ -45,37 +49,38 @@ def main(cfg_path: str):
     train_path = cfg["data"]["train_path"]
     assert os.path.exists(train_path), f"File not found: {train_path}"
 
-    # indices split
-    with open(train_path, "r", encoding="utf-8") as f:
-        n = sum(1 for _ in f)
-    print(f"number of lines in train.txt: {n}")
+    # max_train = int(cfg["data"].get("max_train_rows", 5_000_000))
+    # max_val = int(cfg["data"].get("max_val_rows", 50_000))
+    # max_total = max_train + max_val
 
-    idx = np.arange(n)
-    np.random.shuffle(idx)
-    max_rows = cfg["data"].get("max_rows", None)
-    if max_rows is not None:
-        max_rows = int(max_rows)
-        if max_rows > 0:
-            idx = idx[: min(len(idx), max_rows)]
-    
+    offsets = build_line_offsets(train_path, max_lines=None)
+
+    rng = np.random.default_rng(cfg["train"]["seed"])
+    perm = rng.permutation(len(offsets))
+    offsets = offsets[perm]
+
     valid_ratio = cfg["data"]["valid_ratio"]
-    n_val = int(len(idx) * valid_ratio)
-    val_idx = idx[:n_val]
-    tr_idx = idx[n_val:]
+    n_val = int(len(offsets) * valid_ratio)
+
+    val_offsets = offsets[:n_val]
+    tr_offsets = offsets[n_val:]
+
+    print(f"Train rows: {len(tr_offsets):,}  Val rows: {len(val_offsets):,}")
 
     # datasets
-    ds_tr = CriteoIterable(
-        train_path, tr_idx,
-        hash_bucket_size=cfg["features"]["hash_bucket_size"],
-        hash_bucket_size_per_field=cfg["features"]["hash_bucket_size_per_field"],
+    ds_tr = CriteoOffsetDatasetFieldWise(
+        train_path,
+        tr_offsets,
+        bucket_per_field=cfg["features"]["hash_bucket_size_per_field"],
         num_dense=cfg["features"]["num_dense"],
         num_sparse=cfg["features"]["num_sparse"],
         cat_missing_token=cfg["features"]["cat_missing_token"],
     )
-    ds_val = CriteoIterable(
-        train_path, val_idx,
-        hash_bucket_size=cfg["features"]["hash_bucket_size"],
-        hash_bucket_size_per_field=cfg["features"]["hash_bucket_size_per_field"],
+
+    ds_val = CriteoOffsetDatasetFieldWise(
+        train_path,
+        val_offsets,
+        bucket_per_field=cfg["features"]["hash_bucket_size_per_field"],
         num_dense=cfg["features"]["num_dense"],
         num_sparse=cfg["features"]["num_sparse"],
         cat_missing_token=cfg["features"]["cat_missing_token"],
@@ -86,18 +91,18 @@ def main(cfg_path: str):
         batch_size=cfg["data"]["batch_size"],
         shuffle=True,
         num_workers=cfg["data"]["num_workers"],
-        pin_memory=True,
+        pin_memory=False,
         collate_fn=criteo_collate,
         drop_last=True,
     )
     dl_val = DataLoader(
         ds_val,
         batch_size=cfg["data"]["batch_size"],
-        shuffle=False,
+        shuffle=True,
         num_workers=cfg["data"]["num_workers"],
-        pin_memory=True,
+        pin_memory=False,
         collate_fn=criteo_collate,
-        drop_last=False,
+        drop_last=True,
     )
 
     model = DeepFMFieldWise(
